@@ -17,11 +17,11 @@ CHAT_ID=os.getenv("CHAT_ID")
 bot = Bot(token=TOKEN)
 dp = Dispatcher(bot=bot)
 
-# Инициализация базы данных SQLite
+
 conn = sqlite3.connect('user_data.db')
 cursor = conn.cursor()
 
-# Создание таблицы, если она не существует
+
 cursor.execute('''
     CREATE TABLE IF NOT EXISTS user_messages (
         user_id INTEGER PRIMARY KEY,
