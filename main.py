@@ -7,6 +7,14 @@ import time
 import sqlite3
 from dotenv import load_dotenv
 import os
+import logging
+
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
+    filename = "bot.log"
+)
 
 load_dotenv()
 TOKEN = os.getenv("BOT_TOKEN")
@@ -67,13 +75,30 @@ async def handle_message(message: Message):
             photo_id = message.photo[-1].file_id
             caption = message.caption if message.caption else ""
             await bot.send_photo(chat_id=CHAT_ID,photo=photo_id,caption=caption)
+            logging.info(f'Отправлено фото от {message.from_user.full_name}')
         elif message.text:
             text = message.text
             await bot.send_message(chat_id=CHAT_ID, text=text)
+            logging.info(f'Отправлен текст от {message.from_user.full_name}')
+        elif message.video_note:
+            video_note_id = message.video_note.file_id
+            await bot.send_video_note(chat_id=CHAT_ID, video_note=video_note_id)
+            logging.info(f'Отправлен кружок от {message.from_user.full_name}')
+        elif message.voice:
+            voice_id = message.voice.file_id
+            caption = message.caption if message.caption else ""
+            await bot.send_voice(chat_id=CHAT_ID, voice=voice_id, caption=caption)
+            logging.info(f'Отправлен гс от {message.from_user.full_name}')
         elif message.video:
             video_id = message.video.file_id
             caption = message.caption if message.caption else ""
             await bot.send_video(chat_id=CHAT_ID, video=video_id, caption=caption)
+            logging.info(f'Отправлено видео от {message.from_user.full_name}')
+        else:
+            await message.answer("Неподдерживаемый формат сообщения.\n Вы можете отправить текст, фото, видео или голосовое сообщение.")
+            logging.info(f'Неподдерживаемый формат сообщения от {message.from_user.full_name}')
+
+
 
 
 
@@ -84,8 +109,11 @@ async def main():
 if __name__ == '__main__':
     try:
         asyncio.run(main())
+        logging.info('Бот запущен')
     except KeyboardInterrupt:
         print("Бот остановлен")
+    except Exception as e:
+        logging.error(f"Произошла ошибка: {e}")
     finally:
         conn.close()  
 
