@@ -28,50 +28,27 @@ async def handle_message(message: Message):
             user_mention = f"@{user.username}"
         else:
             user_mention = f"{user.full_name} (ID: {user.id})"
-
-        if message.photo:
-            photo_id = message.photo[-1].file_id
-            original_caption = message.caption or ""
-            forward_content = f"От {user_mention}:\n{original_caption}".strip()
-            
-            
-        elif message.text:
-            forward_content = f"От {user_mention}:\n{message.text}"
-            
-
-        elif message.video_note:
-            forward_content = message.video_note.file_id
-            
-            
-        elif message.voice:
-            voice_id = message.voice.file_id
-            original_caption = message.caption or ""
-            forward_caption = f"От {user_mention}:\n{original_caption}".strip()
-            
-
-        elif message.video:
-            video_id = message.video.file_id
-            original_caption = message.caption or ""
-            forward_caption = f"От {user_mention}:\n{original_caption}".strip()
-            
-            
-        else:
-            forward_content=f"Неподдерживаемый формат сообщения❌.\n Вы можете отправить текст, фото, видео или голосовое сообщение."
         for admin_id in config.ADMIN_ID:
             try:
-                if message.photo:  # Если сообщение содержит фото
-                    await bot.send_photo(chat_id=admin_id, photo=photo_id, caption=forward_content)
-                elif message.text:  # Если сообщение содержит текст
-                    await bot.send_message(chat_id=admin_id, text=forward_content)
-                elif message.video_note:  # Если сообщение содержит видео-кружок
-                    await bot.send_message(chat_id=admin_id, text=forward_content)
+                if message.photo:
+                    photo_id = message.photo[-1].file_id
+                    caption = f"Сообщение от {user_mention}:"
+                    await bot.send_photo(chat_id=admin_id, photo=photo_id, caption=caption)
+                elif message.text:
+                    await bot.send_message(chat_id=admin_id, text=user.mention + ": " + message.text)
+                elif message.video_note:
+                    await bot.send_message(chat_id=admin_id, text=user_mention)
                     await bot.send_video_note(chat_id=admin_id, video_note=message.video_note.file_id)
-                elif message.voice:  # Если сообщение содержит голосовое сообщение
-                    await bot.send_voice(chat_id=admin_id, voice=message.voice.file_id, caption=forward_content)
-                elif message.video:  # Если сообщение содержит видео
-                    await bot.send_video(chat_id=admin_id, video=message.video.file_id, caption=forward_content)
+                elif message.voice:
+                    await bot.send_voice(chat_id=admin_id, voice=message.voice.file_id, caption=user_mention)
+                elif message.video:
+                    await bot.send_video(chat_id=admin_id, video=message.video.file_id, caption=user_mention)
                 else:
-                    await bot.send_message(chat_id=admin_id, text=forward_content)
+                    await bot.send_message(chat_id=admin_id, text=user_mention)
 
             except Exception as e:
                 print(f"Ошибка при отправке админу {admin_id}: {e}")
+
+            
+
+
