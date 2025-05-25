@@ -1,5 +1,5 @@
 from aiogram import F
-from aiogram.filters import CommandStart
+from aiogram.filters import CommandStart , Command
 from aiogram.types import Message
 from app import config, database
 
@@ -10,11 +10,46 @@ dp = Dispatcher()
 
 @dp.message(CommandStart())
 async def start(message: Message):
-    await message.answer("Привет , отправь мне сообщение и я перешлю его админам!")
+    await message.answer("1. Что ты хочешь отправить?\n"
+                            "🔘 Новость о каршеринге\n"
+                            "🔘 Личный случай / история\n"
+                            "🔘 Фото / видео\n"
+                            "🔘 Вопрос или идея для блога\n\n"
+                            "2. Насколько это срочно?\n"
+                         "🔘 Просто поделиться\n"
+                         "🔘 Можно опубликовать сегодня\n"
+                         "🔘 Это важно — может повлиять на других\n\n"
+                         "3. Хочешь, чтобы мы указали тебя как автора?\n"
+                         "🔘 Да, укажите свой @ник\n"
+                         "🔘 Нет, пусть будет анонимно\n\n"
+                         "Напишите сообщение ниже и админы его получат⬇️"
+                         )
+
+@dp.message(Command("send"))
+async def send(message: Message):
+    if str(message.from_user.id) not in config.ADMINS:
+        await message.answer("У вас нет доступа к этой команде.")
+        return
+
+    commands_parts = message.text.split(maxsplit=2)
+    if len(commands_parts) < 3:
+        await message.answer("Надо так /send @username сообщение\n Ещё раз напиши команду")
+    try:
+        username = commands_parts[1]
+        text = commands_parts[2]
+        chat = await bot.get_chat(username)
+        user_id = chat.id
+        await bot.send_message(chat_id=user_id, text=text)
+        await message.answer(f"Сообщение успешно отправлено пользователю: {username}.")
+    except Exception as e:
+        print(f"Ошибка при отправке пользователю {username}: {e}")
+        await message.answer(
+            f"Не удалось отправить сообщение пользователю {username}. Возможно, он не начинал диалог с ботом.")
 
 
 @dp.message(F.chat.type=='private')
 async def handle_message(message: Message):
+    global message_delivered
     user_id = message.from_user.id
     wait_time = await database.check_rate_limit(user_id)
 
@@ -25,29 +60,35 @@ async def handle_message(message: Message):
         
         user = message.from_user
         if user.username:
-            user_mention = f"@{user.username}"
+            user_mention = f"@{user.username} (ID: {user.id})"
         else:
             user_mention = f"{user.full_name} (ID: {user.id})"
-        for admin_id in config.ADMIN_ID:
+        for admin in config.ADMINS:
             try:
                 if message.photo:
                     photo_id = message.photo[-1].file_id
                     caption = f"Сообщение от {user_mention}:"
-                    await bot.send_photo(chat_id=admin_id, photo=photo_id, caption=caption)
+                    await bot.send_photo(chat_id=admin, photo=photo_id, caption=caption)
                 elif message.text:
-                    await bot.send_message(chat_id=admin_id, text=user.mention + ": " + message.text)
+                    await bot.send_message(chat_id=admin, text=user_mention + ": " + message.text)
+                    print("Обработан текст")
                 elif message.video_note:
-                    await bot.send_message(chat_id=admin_id, text=user_mention)
-                    await bot.send_video_note(chat_id=admin_id, video_note=message.video_note.file_id)
+                    await bot.send_message(chat_id=admin, text=user_mention)
+                    await bot.send_video_note(chat_id=admin, video_note=message.video_note.file_id)
                 elif message.voice:
-                    await bot.send_voice(chat_id=admin_id, voice=message.voice.file_id, caption=user_mention)
+                    await bot.send_voice(chat_id=admin, voice=message.voice.file_id, caption=user_mention)
                 elif message.video:
-                    await bot.send_video(chat_id=admin_id, video=message.video.file_id, caption=user_mention)
+                    await bot.send_video(chat_id=admin, video=message.video.file_id, caption=user_mention)
                 else:
-                    await bot.send_message(chat_id=admin_id, text=user_mention)
+                    await bot.send_message(chat_id=admin, text=user_mention)
+
+                message_delivered = True
 
             except Exception as e:
-                print(f"Ошибка при отправке админу {admin_id}: {e}")
+                print(f"Ошибка при отправке админу {admin}: {e}")
+
+        if message_delivered:
+            await message.answer("Сообщение успешно отправлено✅.")
 
             
 
