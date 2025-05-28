@@ -5,8 +5,8 @@ from aiogram.types import Message
 
 class AlbumMiddleware(BaseMiddleware):
 
+    def __init__(self, wait_time: float = 1.0):
 
-    def __init__(self, wait_time: float = 0.5):
         self.wait_time = wait_time
         self.albums: Dict[str, List[Message]] = {}
         self.lock = asyncio.Lock()
@@ -19,7 +19,6 @@ class AlbumMiddleware(BaseMiddleware):
     ) -> Any:
 
         if not event.media_group_id:
-
             return await handler(event, data)
 
 
@@ -34,11 +33,20 @@ class AlbumMiddleware(BaseMiddleware):
             if event.media_group_id in self.albums:
                 messages = self.albums[event.media_group_id]
                 if len(messages) > 0 and messages[-1].message_id == event.message_id:
-                    # Это последнее сообщение в альбоме, добавляем информацию в data
+
                     data["album"] = messages
-                    # Удаляем альбом из словаря
+
+
+                    print(f"Медиа-группа {event.media_group_id} собрана полностью, {len(messages)} сообщений")
+
+
+                    for msg in messages:
+                        if msg.caption:
+                            print(f"Сообщение {msg.message_id} содержит подпись: {msg.caption}")
+
+
                     del self.albums[event.media_group_id]
-                    # Обрабатываем альбом
+
                     return await handler(event, data)
 
 

@@ -2,7 +2,6 @@ from aiogram import F
 from aiogram.filters import CommandStart , Command
 from aiogram.types import Message , InputMediaVideo , InputMediaPhoto , InputMediaDocument
 from app import config, database
-import asyncio
 from aiogram import Bot , Dispatcher
 from app.middleware import AlbumMiddleware
 
@@ -10,7 +9,7 @@ bot = Bot(token = config.BOT_TOKEN)
 dp = Dispatcher()
 
 
-dp.message.middleware(AlbumMiddleware(wait_time=0.5))
+dp.message.middleware(AlbumMiddleware(wait_time=1.5))
 
 @dp.message(CommandStart())
 async def start(message: Message):
@@ -77,23 +76,43 @@ async def handle_message(message: Message, album=None):
                     media = []
 
 
+                    user_caption = ""
+                    for msg in album:
+                        if msg.caption:
+                            user_caption = msg.caption
+                            print(f"Найдена подпись: {user_caption}")
+                            break
+
                     for i, msg in enumerate(album):
-                        caption = f"Сообщение от {user_mention}:" if i == 0 else ""
+
+                        if i == 0:
+                            if user_caption:
+                                caption = f"Сообщение от {user_mention}:\n\n{user_caption}"
+                            else:
+                                caption = f"Сообщение от {user_mention}:"
+                        else:
+                            caption = None
+
                         if msg.photo:
                             media.append(InputMediaPhoto(
                                 media=msg.photo[-1].file_id,
-                                caption=caption if i == 0 else None
+                                caption=caption
                             ))
                         elif msg.video:
                             media.append(InputMediaVideo(
                                 media=msg.video.file_id,
-                                caption=caption if i == 0 else None
+                                caption=caption
                             ))
                         elif msg.document:
                             media.append(InputMediaDocument(
                                 media=msg.document.file_id,
-                                caption=caption if i == 0 else None
+                                caption=caption
                             ))
+
+
+                    print(f"Медиа для отправки: {len(media)} элементов")
+                    if len(media) > 0 and media[0].caption:
+                        print(f"Текст первого элемента: {media[0].caption}")
 
 
                     if media:
