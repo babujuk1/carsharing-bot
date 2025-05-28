@@ -1,12 +1,16 @@
 from aiogram import F
 from aiogram.filters import CommandStart , Command
-from aiogram.types import Message
+from aiogram.types import Message , InputMediaVideo , InputMediaPhoto , InputMediaDocument
 from app import config, database
-
+import asyncio
 from aiogram import Bot , Dispatcher
+from app.middleware import AlbumMiddleware
 
 bot = Bot(token = config.BOT_TOKEN)
 dp = Dispatcher()
+
+
+dp.message.middleware(AlbumMiddleware(wait_time=0.5))
 
 @dp.message(CommandStart())
 async def start(message: Message):
@@ -25,7 +29,7 @@ async def start(message: Message):
                          "Напишите сообщение ниже и админы его получат⬇️"
                          )
 
-@dp.message(Command("send"))
+@dp.message(F.chat.type=='private',Command("send"))
 async def send(message: Message):
     if str(message.from_user.id) not in config.ADMINS:
         await message.answer("У вас нет доступа к этой команде.")
@@ -47,12 +51,13 @@ async def send(message: Message):
             f"Не удалось отправить сообщение пользователю {username}. Возможно, он не начинал диалог с ботом.")
 
 
+
 @dp.message(F.chat.type=='private')
-async def handle_message(message: Message):
-    global message_delivered
+async def handle_message(message: Message, album=None):
+
+    message_delivered = False
     user_id = message.from_user.id
     wait_time = await database.check_rate_limit(user_id)
-
     if wait_time > 0:
         await message.answer(f"Пожалуйста, подождите {wait_time} секунд перед отправкой следующего сообщения.")
     else:
@@ -63,32 +68,70 @@ async def handle_message(message: Message):
             user_mention = f"@{user.username} (ID: {user.id})"
         else:
             user_mention = f"{user.full_name} (ID: {user.id})"
+
         for admin in config.ADMINS:
             try:
-                if message.photo:
-                    photo_id = message.photo[-1].file_id
-                    caption = f"Сообщение от {user_mention}:"
-                    await bot.send_photo(chat_id=admin, photo=photo_id, caption=caption)
-                elif message.text:
-                    await bot.send_message(chat_id=admin, text=user_mention + ": " + message.text)
-                    print("Обработан текст")
-                elif message.video_note:
-                    await bot.send_message(chat_id=admin, text=user_mention)
-                    await bot.send_video_note(chat_id=admin, video_note=message.video_note.file_id)
-                elif message.voice:
-                    await bot.send_voice(chat_id=admin, voice=message.voice.file_id, caption=user_mention)
-                elif message.video:
-                    await bot.send_video(chat_id=admin, video=message.video.file_id, caption=user_mention)
-                else:
-                    await bot.send_message(chat_id=admin, text=user_mention)
 
-                message_delivered = True
+                if album:
+                    print(f"Обработка альбома, количество файлов: {len(album)}")
+                    media = []
+
+
+                    for i, msg in enumerate(album):
+                        caption = f"Сообщение от {user_mention}:" if i == 0 else ""
+                        if msg.photo:
+                            media.append(InputMediaPhoto(
+                                media=msg.photo[-1].file_id,
+                                caption=caption if i == 0 else None
+                            ))
+                        elif msg.video:
+                            media.append(InputMediaVideo(
+                                media=msg.video.file_id,
+                                caption=caption if i == 0 else None
+                            ))
+                        elif msg.document:
+                            media.append(InputMediaDocument(
+                                media=msg.document.file_id,
+                                caption=caption if i == 0 else None
+                            ))
+
+
+                    if media:
+                        await bot.send_media_group(chat_id=admin, media=media)
+                        message_delivered = True
+                        print(f"Альбом успешно отправлен администратору {admin}")
+
+
+                else:
+                    if message.photo:
+                        photo_id = message.photo[-1].file_id
+                        caption = f"Сообщение от {user_mention}:"
+                        await bot.send_photo(chat_id=admin, photo=photo_id, caption=caption)
+                    elif message.text:
+                        await bot.send_message(chat_id=admin, text=user_mention + ": " + message.text)
+                        print("Обработан текст")
+                    elif message.video_note:
+                        await bot.send_message(chat_id=admin, text=user_mention)
+                        await bot.send_video_note(chat_id=admin, video_note=message.video_note.file_id)
+                    elif message.voice:
+                        await bot.send_voice(chat_id=admin, voice=message.voice.file_id, caption=user_mention)
+                    elif message.video:
+                        await bot.send_video(chat_id=admin, video=message.video.file_id, caption=user_mention)
+                    else:
+                        await bot.send_message(chat_id=admin, text=user_mention)
+
+                    message_delivered = True
+
 
             except Exception as e:
                 print(f"Ошибка при отправке админу {admin}: {e}")
 
+
         if message_delivered:
-            await message.answer("Сообщение успешно отправлено✅.")
+            if not album or (album and message.message_id == album[-1].message_id):
+                await message.answer("Сообщение успешно отправлено✅.")
+        else:
+            print("Сообщение не доставлено")
 
             
 
